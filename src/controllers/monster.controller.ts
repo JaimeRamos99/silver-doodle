@@ -4,11 +4,25 @@ import { DBError, Id, NotNullViolationError } from 'objection';
 import { Monster } from '../models';
 import csv from 'csvtojson';
 import { readFileSync } from 'fs';
+import { calculatePaginationParams } from '../common';
 
 export const get = async (req: Request, res: Response): Promise<Response> => {
   const id: Id = req.params.id;
   const monster = await Monster.query().findById(id);
+  if (!monster) {
+    return res.sendStatus(StatusCodes.NOT_FOUND);
+  }
   return res.status(StatusCodes.OK).json(monster);
+};
+
+export const list = async (req: Request, res: Response): Promise<Response> => {
+  const { page, count } = req.query;
+  const { limit, offset } = calculatePaginationParams(
+    page as string,
+    count as string
+  );
+  const monsters = await Monster.query().limit(limit).offset(offset);
+  return res.status(StatusCodes.OK).json(monsters);
 };
 
 export const create = async (
@@ -24,7 +38,10 @@ export const update = async (
   res: Response
 ): Promise<Response> => {
   const id: Id = req.params.id;
-  await Monster.query().findById(id).patch(req.body);
+  const monster = await Monster.query().findById(id).patch(req.body);
+  if (!monster) {
+    return res.sendStatus(StatusCodes.NOT_FOUND);
+  }
   return res.sendStatus(StatusCodes.OK);
 };
 
@@ -33,7 +50,10 @@ export const remove = async (
   res: Response
 ): Promise<Response> => {
   const id: Id = req.params.id;
-  await Monster.query().deleteById(id);
+  const deleted = await Monster.query().deleteById(id);
+  if (deleted === 0) {
+    return res.sendStatus(StatusCodes.NOT_FOUND);
+  }
   return res.sendStatus(StatusCodes.NO_CONTENT);
 };
 
@@ -56,6 +76,7 @@ export const importCsv = async (
 
 export const MonsterController = {
   get,
+  list,
   create,
   update,
   remove,
